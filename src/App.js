@@ -29,7 +29,10 @@ const defaultCameraSettings = {
     stopTime: '05:00',  // 預設 5 AM
   },
   hdr: false,
-  currentDate: new Date(), // 模擬日期和時間
+  // 模擬日期和時間，設定為1970年1月1日0時0分 (台灣時間, UTC+8)
+  // Date.UTC(year, monthIndex, day, hours, minutes, seconds)
+  // 1970/01/01 00:00 TST (UTC+8) 等同於 1969/12/31 16:00 UTC
+  currentDate: new Date(Date.UTC(1969, 11, 31, 16, 0, 0)),
 };
 
 // 各選項的對應值 (僅英文)
@@ -48,12 +51,12 @@ const TIMELAPSE_PERIODS = ['ALL DAY', '1 HOUR', '2 HOUR', '3 HOUR', '4 HOUR'];
 const IR_FLASH_RANGES = ['Economy', 'Long Range', 'Fast Motion'];
 const LANGUAGES = ['English'];
 
-// 將日期格式化為 MM/DD/YY
+// 將日期格式化為YYYY/MM/DD
 const formatDate = (date) => {
+  const year = date.getFullYear();
   const month = (date.getMonth() + 1).toString().padStart(2, '0');
   const day = date.getDate().toString().padStart(2, '0');
-  const year = date.getFullYear().toString().slice(-2);
-  return `${month}/${day}/${year}`;
+  return `${year}/${month}/${day}`;
 };
 
 // 將時間格式化為 HH:MM AM/PM
@@ -96,6 +99,15 @@ const LCDScreen = ({ settings }) => {
       <LiveImageMock /> {/* 即時影像模擬背景 */}
       <div className="relative z-10 flex flex-col h-full p-2"> {/* 移除 overflow-y-auto custom-scrollbar */}
         <h2 className="text-base font-bold text-yellow-400 mb-3 border-b border-yellow-400 pb-1 text-center">相機狀態總覽</h2>
+
+        {/* 調整後的電量、SD卡、日期時間顯示區塊 */}
+        <div className="text-lg mb-3 flex justify-between items-center w-full flex-wrap"> {/* Adjusted font size to text-lg and added flex-wrap for responsiveness */}
+            <span className="mr-4">SD 卡: {sdCardUsage}</span> {/* Moved SD Card first */}
+            <span className="mr-4">{formatDate(currentDate)} {formatTime(currentDate)}</span> {/* Moved Time second */}
+            <span>電量: {batteryPercentage}</span> {/* Moved Battery third */}
+        </div>
+        <div className="border-b-2 border-yellow-400 w-full mb-3"></div> {/* Increased border thickness and changed color to yellow */}
+
 
         <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
           <div className="col-span-2 flex justify-between">
@@ -161,7 +173,7 @@ const LCDScreen = ({ settings }) => {
           </div>
           <div className="col-span-2 flex justify-between">
             <span>HDR:</span>
-            <span className={`font-bold ${hdr ? 'text-green-400' : 'text-red-400'}`}>{hdr ? 'ON' : 'OFF'}</span>
+            <span className="font-bold">{hdr ? 'ON' : 'OFF'}</span>
           </div>
           <div className="col-span-2 flex justify-between">
             <span>語言:</span>
@@ -205,11 +217,7 @@ const LCDScreen = ({ settings }) => {
           </div>
         </div>
 
-        <div className="flex-grow flex items-end justify-between mt-auto text-xs border-t border-gray-700 pt-2">
-          <span>電量: {batteryPercentage}</span>
-          <span>SD 卡: {sdCardUsage}</span>
-          <span>{formatDate(currentDate)} {formatTime(currentDate)}</span>
-        </div>
+        {/* 底部信息 (已移動到上方) */}
       </div>
     </div>
   );
@@ -218,6 +226,16 @@ const LCDScreen = ({ settings }) => {
 
 // 設置控制面板組件
 const SettingsControlPanel = ({ settings, setSettings }) => {
+  // 本地狀態來處理時間調整的下拉選單值
+  const [tempYear, setTempYear] = useState(settings.currentDate.getFullYear());
+  const [tempMonth, setTempMonth] = useState(settings.currentDate.getMonth() + 1);
+  const [tempDay, setTempDay] = useState(settings.currentDate.getDate());
+  const [tempHour, setTempHour] = useState(settings.currentDate.getHours());
+  const [tempMinute, setTempMinute] = useState(settings.currentDate.getMinutes());
+
+  // 移除了監聽 settings.currentDate 變化以同步時間調整下拉選單的 useEffect
+  // 這樣用戶在選擇時，值就不會被實時的 current Date 更新覆蓋而「跳掉」
+
   const handleChange = (e) => {
     const { name, value } = e.target; // 移除了 type, checked 因為不再直接使用
 
@@ -242,6 +260,19 @@ const SettingsControlPanel = ({ settings, setSettings }) => {
     });
   };
 
+  const handleConfirmTime = () => {
+    const newDate = new Date(tempYear, tempMonth - 1, tempDay, tempHour, tempMinute);
+    if (isNaN(newDate.getTime())) {
+        alert("請選擇一個有效的日期和時間！");
+        return;
+    }
+    setSettings(prevSettings => ({
+      ...prevSettings,
+      currentDate: newDate,
+    }));
+    alert("時間已更新！");
+  };
+
   const handleResetDefaults = () => {
     if (window.confirm("確定要恢復所有預設設定嗎？")) {
       setSettings(defaultCameraSettings);
@@ -259,10 +290,71 @@ const SettingsControlPanel = ({ settings, setSettings }) => {
     alert("韌體已是最新版本，無需升級。");
   };
 
+  // 生成年份選項 (例如從當前年份前5年到後5年)
+  const years = Array.from({ length: 11 }, (_, i) => new Date().getFullYear() - 5 + i);
+  // 生成月份選項 (1-12)
+  const months = Array.from({ length: 12 }, (_, i) => i + 1);
+  // 生成日期選項 (動態根據月份和年份)
+  const getDaysInMonth = (year, month) => new Date(year, month, 0).getDate();
+  const days = Array.from({ length: getDaysInMonth(tempYear, tempMonth) }, (_, i) => i + 1);
+  // 生成小時選項 (0-23)
+  const hours = Array.from({ length: 24 }, (_, i) => i);
+  // 生成分鐘選項 (0-59)
+  const minutes = Array.from({ length: 60 }, (_, i) => i);
+
 
   return (
-    <div className="p-6 bg-gray-700 rounded-lg shadow-inner w-full overflow-y-auto custom-scrollbar h-full"> {/* 移除 max-w-sm */}
+    <div className="p-6 bg-gray-700 rounded-lg shadow-inner w-full overflow-y-auto custom-scrollbar h-full">
       <h2 className="text-xl font-bold text-blue-300 mb-4 text-center">調整相機設定</h2>
+
+      {/* 時間調整區塊 */}
+      <div className="border-b border-gray-600 pt-4 mb-4">
+        <h3 className="text-lg font-bold text-blue-200 mb-2">時間調整 (Time Adjustment)</h3>
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2 mb-4">
+          <div>
+            <label htmlFor="year" className="block text-gray-200 text-sm font-bold mb-1">年 (Year):</label>
+            <select id="year" value={tempYear} onChange={(e) => setTempYear(parseInt(e.target.value))}
+              className="w-full p-2 bg-gray-800 border border-gray-600 rounded-md text-white text-sm focus:ring-blue-500 focus:border-blue-500">
+              {years.map(y => <option key={y} value={y}>{y}</option>)}
+            </select>
+          </div>
+          <div>
+            <label htmlFor="month" className="block text-gray-200 text-sm font-bold mb-1">月 (Month):</label>
+            <select id="month" value={tempMonth} onChange={(e) => setTempMonth(parseInt(e.target.value))}
+              className="w-full p-2 bg-gray-800 border border-gray-600 rounded-md text-white text-sm focus:ring-blue-500 focus:border-blue-500">
+              {months.map(m => <option key={m} value={m}>{m}</option>)}
+            </select>
+          </div>
+          <div>
+            <label htmlFor="day" className="block text-gray-200 text-sm font-bold mb-1">日 (Day):</label>
+            <select id="day" value={tempDay} onChange={(e) => setTempDay(parseInt(e.target.value))}
+              className="w-full p-2 bg-gray-800 border border-gray-600 rounded-md text-white text-sm focus:ring-blue-500 focus:border-blue-500">
+              {days.map(d => <option key={d} value={d}>{d}</option>)}
+            </select>
+          </div>
+          <div>
+            <label htmlFor="hour" className="block text-gray-200 text-sm font-bold mb-1">時 (Hour):</label>
+            <select id="hour" value={tempHour} onChange={(e) => setTempHour(parseInt(e.target.value))}
+              className="w-full p-2 bg-gray-800 border border-gray-600 rounded-md text-white text-sm focus:ring-blue-500 focus:border-blue-500">
+              {hours.map(h => <option key={h} value={h}>{String(h).padStart(2, '0')}</option>)}
+            </select>
+          </div>
+          <div>
+            <label htmlFor="minute" className="block text-gray-200 text-sm font-bold mb-1">分 (Minute):</label>
+            <select id="minute" value={tempMinute} onChange={(e) => setTempMinute(parseInt(e.target.value))}
+              className="w-full p-2 bg-gray-800 border border-gray-600 rounded-md text-white text-sm focus:ring-blue-500 focus:border-blue-500">
+              {minutes.map(m => <option key={m} value={m}>{String(m).padStart(2, '0')}</option>)}
+            </select>
+          </div>
+        </div>
+        <button
+          className="w-full bg-blue-600 text-white p-3 rounded-md shadow-md hover:bg-blue-700 transition-all duration-200 flex items-center justify-center font-bold mb-4"
+          onClick={handleConfirmTime}
+        >
+          確定時間 (Confirm Time)
+        </button>
+      </div>
+
 
       <div className="grid grid-cols-1 gap-4">
         {/* 操作模式 */}
@@ -505,13 +597,36 @@ const App = () => {
   const [settings, setSettings] = useState(() => {
     // 從 Local Storage 載入設定，如果沒有則使用預設值
     const savedSettings = localStorage.getItem('trailCameraSettings');
-    return savedSettings ? JSON.parse(savedSettings) : defaultCameraSettings;
+    // 解析 currentDate 為 Date 物件
+    if (savedSettings) {
+      const parsedSettings = JSON.parse(savedSettings);
+      parsedSettings.currentDate = new Date(parsedSettings.currentDate); // 確保是 Date 物件
+      return parsedSettings;
+    }
+    return defaultCameraSettings;
   });
 
   // 儲存設定到 Local Storage
   useEffect(() => {
     localStorage.setItem('trailCameraSettings', JSON.stringify(settings));
   }, [settings]);
+
+  // 新增：每秒更新 currentDate 狀態
+  useEffect(() => {
+    const timerId = setInterval(() => {
+      setSettings(prevSettings => {
+        const newDate = new Date(prevSettings.currentDate);
+        newDate.setSeconds(newDate.getSeconds() + 1); // 每秒增加1秒
+        return {
+          ...prevSettings,
+          currentDate: newDate,
+        };
+      });
+    }, 1000); // 每1000毫秒 (1秒) 更新一次
+
+    // 清理函數：組件卸載時清除定時器
+    return () => clearInterval(timerId);
+  }, []); // 空依賴陣列表示只在組件掛載和卸載時運行一次
 
   return (
     <div className="flex flex-col items-center justify-center min-h-screen bg-gray-200 p-4 font-inter">
@@ -526,8 +641,8 @@ const App = () => {
           <LCDScreen settings={settings} />
         </div>
 
-        {/* 下方：設定控制面板 (維持自己的背景樣式) */}
-        <div className="w-full flex-grow flex items-stretch max-h-[70vh]">
+        {/* 下方：設定控制面板 (維持自己的背景樣式，並移除其自身的 max-w-sm 確保與 LCD 等寬) */}
+        <div className="w-full flex-grow flex items-stretch max-h-[70vh] mt-6"> {/* 增加一些間距 */}
           <SettingsControlPanel settings={settings} setSettings={setSettings} />
         </div>
       </div>
