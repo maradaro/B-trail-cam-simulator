@@ -94,7 +94,7 @@ const LCDScreen = ({ settings }) => {
   return (
     <div className="relative w-full h-full bg-gray-800 text-white rounded-lg p-4 font-mono text-xs flex flex-col justify-between overflow-hidden">
       <LiveImageMock /> {/* 即時影像模擬背景 */}
-      <div className="relative z-10 flex flex-col h-full overflow-y-auto custom-scrollbar p-2">
+      <div className="relative z-10 flex flex-col h-full p-2"> {/* 移除 overflow-y-auto custom-scrollbar */}
         <h2 className="text-base font-bold text-yellow-400 mb-3 border-b border-yellow-400 pb-1 text-center">相機狀態總覽</h2>
 
         <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
@@ -219,7 +219,7 @@ const LCDScreen = ({ settings }) => {
 // 設置控制面板組件
 const SettingsControlPanel = ({ settings, setSettings }) => {
   const handleChange = (e) => {
-    const { name, value } = e.target;
+    const { name, value } = e.target; // 移除了 type, checked 因為不再直接使用
 
     setSettings(prevSettings => {
       let newSettings = { ...prevSettings };
@@ -261,7 +261,7 @@ const SettingsControlPanel = ({ settings, setSettings }) => {
 
 
   return (
-    <div className="p-6 bg-gray-700 rounded-lg shadow-inner w-full max-w-sm overflow-y-auto custom-scrollbar h-full">
+    <div className="p-6 bg-gray-700 rounded-lg shadow-inner w-full overflow-y-auto custom-scrollbar h-full"> {/* 移除 max-w-sm */}
       <h2 className="text-xl font-bold text-blue-300 mb-4 text-center">調整相機設定</h2>
 
       <div className="grid grid-cols-1 gap-4">
@@ -519,14 +519,15 @@ const App = () => {
       {/* 新增製作單位標註 */}
       <p className="text-sm text-gray-600 mb-8">臺北醫學大學 製作</p>
 
-      <div className="relative bg-gray-600 rounded-3xl shadow-2xl p-6 border-4 border-gray-700 w-full max-w-5xl lg:max-w-6xl flex flex-col items-center justify-center gap-6">
-        {/* 上方：LCD 螢幕區 (調整為等寬) */}
-        <div className="w-full md:w-1/2 flex-shrink-0 min-h-[250px] md:min-h-[300px] lg:min-h-[350px] aspect-video"> {/* 使用 aspect-video 保持比例 */}
+      {/* 總容器，現在只有這兩個區塊會垂直堆疊，並且各自由內部定義背景 */}
+      <div className="w-full max-w-5xl lg:max-w-6xl flex flex-col items-center justify-center gap-6">
+        {/* 上方：LCD 螢幕區 (現在帶有自己的背景樣式) */}
+        <div className="w-full flex-shrink-0 min-h-[250px] md:min-h-[300px] lg:min-h-[350px] bg-gray-600 rounded-3xl shadow-2xl p-6 border-4 border-gray-700">
           <LCDScreen settings={settings} />
         </div>
 
-        {/* 下方：設定控制面板 (調整為等寬，並放在 LCD 下方) */}
-        <div className="w-full md:w-1/2 flex-grow flex items-stretch max-h-[70vh]"> {/* 限制高度，確保捲軸有效 */}
+        {/* 下方：設定控制面板 (維持自己的背景樣式) */}
+        <div className="w-full flex-grow flex items-stretch max-h-[70vh]">
           <SettingsControlPanel settings={settings} setSettings={setSettings} />
         </div>
       </div>
